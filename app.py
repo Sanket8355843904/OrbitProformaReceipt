@@ -1,138 +1,68 @@
 import streamlit as st
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm
-from reportlab.lib.utils import ImageReader
+from docx import Document
+from datetime import date
 from io import BytesIO
-import datetime
 
-def create_pdf(data, letterhead_path):
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+TEMPLATE_PATH = "Sales Advance Receipt Template.docx"
 
-    # Draw letterhead image at the top (5 cm height)
-    try:
-        letterhead = ImageReader(letterhead_path)
-        c.drawImage(letterhead, 0, height - 5*cm, width=width, height=5*cm, preserveAspectRatio=True)
-    except Exception as e:
-        print(f"Error loading letterhead image: {e}")
+def generate_filled_docx(data):
+    doc = Document(TEMPLATE_PATH)
+    for p in doc.paragraphs:
+        for key, value in data.items():
+            if key in p.text:
+                inline = p.runs
+                for i in range(len(inline)):
+                    if key in inline[i].text:
+                        inline[i].text = inline[i].text.replace(key, value)
+    # Save to a BytesIO stream instead of a temp file
+    doc_stream = BytesIO()
+    doc.save(doc_stream)
+    doc_stream.seek(0)
+    return doc_stream
 
-    # Start writing below letterhead
-    y = height - 6*cm
-
-    # Title
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width/2, y, "Proforma Receipt")
-    y -= 1.5*cm
-
-    # Customer Info
-    c.setFont("Helvetica", 12)
-    c.drawString(2*cm, y, f"Customer Name: {data['customer_name']}")
-    y -= 0.8*cm
-    c.drawString(2*cm, y, f"Customer Address: {data['customer_address']}")
-    y -= 0.8*cm
-    c.drawString(2*cm, y, f"Contact Number: {data['contact_number']}")
-    y -= 1*cm
-
-    # Receipt Details
-    c.drawString(2*cm, y, f"Invoice Number: {data['invoice_number']}")
-    y -= 0.8*cm
-    c.drawString(2*cm, y, f"Date: {data['date']}")
-    y -= 1*cm
-
-    # Table header
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(2*cm, y, "Description")
-    c.drawString(10*cm, y, "Quantity")
-    c.drawString(13*cm, y, "Unit Price")
-    c.drawString(16*cm, y, "Amount")
-    y -= 0.5*cm
-    c.line(2*cm, y, 19*cm, y)
-    y -= 0.5*cm
-
-    # Table rows (single item for now)
-    c.setFont("Helvetica", 12)
-    for item in data['items']:
-        c.drawString(2*cm, y, item['description'])
-        c.drawString(10*cm, y, str(item['quantity']))
-        c.drawString(13*cm, y, f"{item['unit_price']:.2f}")
-        c.drawString(16*cm, y, f"{item['amount']:.2f}")
-        y -= 0.7*cm
-
-    y -= 0.3*cm
-    c.line(2*cm, y, 19*cm, y)
-    y -= 0.5*cm
-
-    # Total amount
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(13*cm, y, "Total Amount:")
-    c.drawString(16*cm, y, f"{data['total_amount']:.2f}")
-    y -= 2*cm
-
-    # Blank signature box
-    c.setFont("Helvetica", 12)
-    c.drawString(2*cm, y, "Authorized Signature:")
-    c.rect(5*cm, y - 1*cm, 6*cm, 2*cm)  # empty rectangle
-
-    # Footer with company name (match your Word doc style as needed)
-    c.setFont("Helvetica-Oblique", 10)
-    c.drawCentredString(width/2, 1.5*cm, "Higher Orbit Agritech Pvt Ltd - Proforma Receipt")
-
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return buffer
-
-# Streamlit UI
-st.title("Proforma Receipt Generator")
+st.title("🚜 Proforma Receipt Generator (Word Doc)")
 
 with st.form("receipt_form"):
-    st.header("Customer Details")
+    receipt_no = st.text_input("Receipt No", "ORBIT/2025/1/001")
+    receipt_date = st.date_input("Receipt Date", date.today())
+
     customer_name = st.text_input("Customer Name")
-    customer_address = st.text_area("Customer Address")
-    contact_number = st.text_input("Contact Number")
+    address = st.text_area("Address")
+    phone = st.text_input("Phone Number")
+    email = st.text_input("Email (optional)", "")
 
-    st.header("Receipt Details")
-    invoice_number = st.text_input("Invoice Number", value="INV-001")
-    date = st.date_input("Date", value=datetime.date.today())
+    amount_received = st.text_input("Amount Received (₹)")
+    payment_mode = st.selectbox("Payment Mode", ["Cashfree", "Cash", "Other"])
+    reference_id = st.text_input("Reference ID (optional)", "")
+    payment_date = st.date_input("Payment Date", date.today())
 
-    st.header("Items")
-    description = st.text_input("Item Description")
-    quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
-    unit_price = st.number_input("Unit Price", min_value=0.0, step=0.01, format="%.2f", value=0.00)
+    balance_amount = st.text_input("Balance Amount (₹)")
+    tentative_delivery = st.date_input("Tentative Delivery Date", date.today())
 
-    submitted = st.form_submit_button("Generate PDF")
+    submitted = st.form_submit_button("Generate Receipt (DOCX)")
 
 if submitted:
-    amount = quantity * unit_price
-    total_amount = amount  # single item total
-
-    data = {
-        "customer_name": customer_name,
-        "customer_address": customer_address,
-        "contact_number": contact_number,
-        "invoice_number": invoice_number,
-        "date": date.strftime("%d-%m-%Y"),
-        "items": [
-            {
-                "description": description,
-                "quantity": quantity,
-                "unit_price": unit_price,
-                "amount": amount,
-            }
-        ],
-        "total_amount": total_amount,
+    placeholder_map = {
+        "____________": receipt_no.split("/")[-1],
+        "___/___/____": receipt_date.strftime("%d/%m/%Y"),
+        "_____________________________________________________________": customer_name,
+        "__________________________________________________________________": address,
+        "____________________________________________________________": phone,
+        "___________________________________________________________": email or "N/A",
+        "₹ _______________ /-": f"₹ {amount_received} /-",
+        "Cashfree / Cash / Other": payment_mode,
+        "Reference ID (if available):": f"Reference ID (if available): {reference_id or 'N/A'}",
+        "Date of Payment [DD/MM/YYYY]: __ /__ /____": f"Date of Payment [DD/MM/YYYY]: {payment_date.strftime('%d/%m/%Y')}",
+        "₹ _____________________ /-": f"₹ {balance_amount} /-",
+        "Tentative delivery date [DD/MM/YYYY]: ___ /___ /____": f"Tentative delivery date [DD/MM/YYYY]: {tentative_delivery.strftime('%d/%m/%Y')}",
     }
 
-    letterhead_path = "letterhead.jpg"
+    filled_docx = generate_filled_docx(placeholder_map)
 
-    pdf_buffer = create_pdf(data, letterhead_path)
-
-    st.success("PDF generated successfully!")
+    st.success("✅ Word document generated successfully!")
     st.download_button(
-        label="Download Proforma Receipt PDF",
-        data=pdf_buffer,
-        file_name=f"proforma_receipt_{invoice_number}.pdf",
-        mime="application/pdf"
+        label="📄 Download Receipt (DOCX)",
+        data=filled_docx,
+        file_name=f"Receipt_{receipt_no.replace('/', '_')}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
