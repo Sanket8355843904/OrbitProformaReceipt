@@ -1,93 +1,141 @@
 import streamlit as st
-from docx import Document
-from datetime import date
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import cm
+from reportlab.lib.utils import ImageReader
 from io import BytesIO
-from tempfile import NamedTemporaryFile
-import os
-import platform
+import datetime
 
-# Only Windows/macOS support docx2pdf
-if platform.system() not in ("Windows", "Darwin"):
-    st.error("❌ PDF generation with docx2pdf only works on Windows or macOS.")
-    st.stop()
+# Function to create PDF in-memory and return bytes
+def create_pdf(data, letterhead_path):
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
 
-from docx2pdf import convert
+    # Draw letterhead image at the top
+    if letterhead_path:
+        letterhead = ImageReader(letterhead_path)
+        c.drawImage(letterhead, 0, height - 5*cm, width=width, height=5*cm, preserveAspectRatio=True)
 
-TEMPLATE_PATH = "template.docx"
+    # Starting y position below letterhead
+    y = height - 6*cm
 
-def generate_filled_docx(data):
-    doc = Document(TEMPLATE_PATH)
-    for p in doc.paragraphs:
-        for key, value in data.items():
-            if key in p.text:
-                for run in p.runs:
-                    run.text = run.text.replace(key, value)
-    temp_docx = NamedTemporaryFile(delete=False, suffix=".docx")
-    doc.save(temp_docx.name)
-    return temp_docx.name
+    # Title
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, y, "Proforma Receipt")
+    y -= 1.5*cm
 
-def convert_docx_to_pdf(docx_path):
-    temp_pdf = NamedTemporaryFile(delete=False, suffix=".pdf")
-    convert(docx_path, temp_pdf.name)
-    return temp_pdf.name
+    # Customer Info
+    c.setFont("Helvetica", 12)
+    c.drawString(2*cm, y, f"Customer Name: {data['customer_name']}")
+    y -= 0.8*cm
+    c.drawString(2*cm, y, f"Customer Address: {data['customer_address']}")
+    y -= 0.8*cm
+    c.drawString(2*cm, y, f"Contact Number: {data['contact_number']}")
+    y -= 1*cm
+
+    # Receipt Details
+    c.drawString(2*cm, y, f"Invoice Number: {data['invoice_number']}")
+    y -= 0.8*cm
+    c.drawString(2*cm, y, f"Date: {data['date']}")
+    y -= 1*cm
+
+    # Product/Service Details Table header
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(2*cm, y, "Description")
+    c.drawString(10*cm, y, "Quantity")
+    c.drawString(13*cm, y, "Unit Price")
+    c.drawString(16*cm, y, "Amount")
+    y -= 0.5*cm
+    c.line(2*cm, y, 19*cm, y)
+    y -= 0.5*cm
+
+    # Product rows
+    c.setFont("Helvetica", 12)
+    for item in data['items']:
+        c.drawString(2*cm, y, item['description'])
+        c.drawString(10*cm, y, str(item['quantity']))
+        c.drawString(13*cm, y, f"{item['unit_price']:.2f}")
+        c.drawString(16*cm, y, f"{item['amount']:.2f}")
+        y -= 0.7*cm
+
+    y -= 0.3*cm
+    c.line(2*cm, y, 19*cm, y)
+    y -= 0.5*cm
+
+    # Total Amount
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(13*cm, y, "Total Amount:")
+    c.drawString(16*cm, y, f"{data['total_amount']:.2f}")
+    y -= 2*cm
+
+    # Blank Signature Space
+    c.setFont("Helvetica", 12)
+    c.drawString(2*cm, y, "Authorized Signature:")
+    c.rect(5*cm, y - 1*cm, 6*cm, 2*cm)  # Blank box for signature
+
+    # Footer
+    c.setFont("Helvetica-Oblique", 10)
+    c.drawCentredString(width/2, 1.5*cm, "Higher Orbit Agritech Pvt Ltd - Proforma Receipt")
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
 
 # Streamlit UI
-st.set_page_config(page_title="Proforma Receipt Generator", layout="centered")
-st.title("🚜 Proforma Receipt Generator")
-st.caption("For Higher Orbit Agritech Pvt. Ltd.")
+st.title("Proforma Receipt Generator")
 
+# Input form
 with st.form("receipt_form"):
-    st.subheader("Receipt Information")
-    receipt_suffix = st.text_input("Receipt Number (last 3 digits)", "001")
-    receipt_no = f"ORBIT/2025/1/{receipt_suffix.zfill(3)}"
-    receipt_date = st.date_input("Receipt Date", date.today())
-
-    st.subheader("Customer Details")
+    st.header("Customer Details")
     customer_name = st.text_input("Customer Name")
-    address = st.text_area("Address")
-    phone = st.text_input("Phone Number")
-    email = st.text_input("Email (optional)", "")
+    customer_address = st.text_area("Customer Address")
+    contact_number = st.text_input("Contact Number")
 
-    st.subheader("Payment Details")
-    amount_received = st.text_input("Amount Received (₹)")
-    payment_mode = st.selectbox("Payment Mode", ["Cashfree", "Cash", "Other"])
-    reference_id = st.text_input("Reference ID (optional)", "")
-    payment_date = st.date_input("Payment Date", date.today())
+    st.header("Receipt Details")
+    invoice_number = st.text_input("Invoice Number", value="INV-001")
+    date = st.date_input("Date", value=datetime.date.today())
 
-    st.subheader("Booking Details")
-    balance_amount = st.text_input("Balance Amount (₹)")
-    tentative_delivery = st.date_input("Tentative Delivery Date", date.today())
+    st.header("Items")
 
-    submitted = st.form_submit_button("Generate Receipt")
+    # For simplicity, allow entering 1 item; can extend to dynamic list if needed
+    description = st.text_input("Item Description")
+    quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
+    unit_price = st.number_input("Unit Price", min_value=0.0, step=0.01, format="%.2f", value=0.00)
+
+    submitted = st.form_submit_button("Generate PDF")
 
 if submitted:
-    placeholder_map = {
-        "____________": receipt_suffix.zfill(3),
-        "___/___/____": receipt_date.strftime("%d/%m/%Y"),
-        "_____________________________________________________________": customer_name,
-        "__________________________________________________________________": address,
-        "____________________________________________________________": phone,
-        "___________________________________________________________": email or "N/A",
-        "₹ _______________ /-": f"₹ {amount_received} /-",
-        "Cashfree / Cash / Other": payment_mode,
-        "Reference ID (if available):": f"Reference ID (if available): {reference_id or 'N/A'}",
-        "Date of Payment [DD/MM/YYYY]: __ /__ /____": f"Date of Payment [DD/MM/YYYY]: {payment_date.strftime('%d/%m/%Y')}",
-        "₹ _____________________ /-": f"₹ {balance_amount} /-",
-        "Tentative delivery date [DD/MM/YYYY]: ___ /___ /____": f"Tentative delivery date [DD/MM/YYYY]: {tentative_delivery.strftime('%d/%m/%Y')}",
+    amount = quantity * unit_price
+    total_amount = amount  # For now, single item
+
+    data = {
+        "customer_name": customer_name,
+        "customer_address": customer_address,
+        "contact_number": contact_number,
+        "invoice_number": invoice_number,
+        "date": date.strftime("%d-%m-%Y"),
+        "items": [
+            {
+                "description": description,
+                "quantity": quantity,
+                "unit_price": unit_price,
+                "amount": amount,
+            }
+        ],
+        "total_amount": total_amount,
     }
 
-    filled_docx_path = generate_filled_docx(placeholder_map)
-    pdf_path = convert_docx_to_pdf(filled_docx_path)
+    # Provide your letterhead image path here or upload via Streamlit if you want
+    letterhead_path = "letterhead.png"  # Make sure this file is in the same folder or adjust path
 
-    with open(pdf_path, "rb") as f:
-        st.success("✅ PDF receipt generated successfully!")
-        st.download_button(
-            label="📄 Download Receipt (PDF)",
-            data=f,
-            file_name=f"Receipt_{receipt_suffix.zfill(3)}.pdf",
-            mime="application/pdf"
-        )
+    pdf_buffer = create_pdf(data, letterhead_path)
 
-    # Cleanup temp files
-    os.remove(filled_docx_path)
-    os.remove(pdf_path)
+    st.success("PDF generated successfully!")
+    st.download_button(
+        label="Download Proforma Receipt PDF",
+        data=pdf_buffer,
+        file_name=f"proforma_receipt_{invoice_number}.pdf",
+        mime="application/pdf"
+    )
