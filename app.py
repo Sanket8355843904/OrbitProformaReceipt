@@ -5,37 +5,37 @@ from io import BytesIO
 
 TEMPLATE_PATH = "Sales Advance Receipt Template.docx"
 
-def replace_placeholder(paragraph, placeholder, replacement):
-    full_text = ''.join(run.text for run in paragraph.runs)
-    if placeholder not in full_text:
-        return
-    new_text = full_text.replace(placeholder, replacement)
-    for run in paragraph.runs:
-        run.text = ''
-    paragraph.runs[0].text = new_text
-
 def generate_filled_docx(data, template_path=TEMPLATE_PATH):
     doc = Document(template_path)
-
-    # Replace in paragraphs
-    for paragraph in doc.paragraphs:
-        for key, val in data.items():
-            replace_placeholder(paragraph, key, val)
-
-    # Replace in tables too (if needed)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    for key, val in data.items():
-                        replace_placeholder(paragraph, key, val)
+    
+    # Clear all paragraphs (optional) or comment this if you want to keep template text
+    # for para in doc.paragraphs:
+    #     p = para._element
+    #     p.getparent().remove(p)
+    
+    # Append your data as paragraphs
+    doc.add_paragraph("Proforma Receipt\n")
+    doc.add_paragraph(f"Receipt No: {data['receipt_no']}\t\tDate: {data['receipt_date']}\n")
+    doc.add_paragraph(f"Customer Name: {data['customer_name']}")
+    doc.add_paragraph(f"Address: {data['address']}")
+    doc.add_paragraph(f"Phone Number: {data['phone']}")
+    doc.add_paragraph(f"Email: {data['email']}")
+    doc.add_paragraph(f"Amount Received: ₹ {data['amount_received']} /-")
+    doc.add_paragraph(f"Payment Mode: {data['payment_mode']}")
+    doc.add_paragraph(f"Reference ID: {data['reference_id']}")
+    doc.add_paragraph(f"Date of Payment: {data['payment_date']}")
+    doc.add_paragraph(f"Balance Amount: ₹ {data['balance_amount']} /-")
+    doc.add_paragraph(f"Tentative Delivery Date: {data['tentative_delivery']}")
+    doc.add_paragraph("\nAcknowledgement:\nWe acknowledge receipt of the above-mentioned amount as advance towards booking of the Orbit PT Pro. This receipt confirms the reservation of your machine. The final invoice will be issued at the time of full payment and delivery.")
+    doc.add_paragraph("\nAuthorised Signatory\n")
+    doc.add_paragraph("For Higher Orbit Agritech Pvt. Ltd.\nGST: 27AAHCH1976Q1ZS")
 
     doc_stream = BytesIO()
     doc.save(doc_stream)
     doc_stream.seek(0)
     return doc_stream
 
-st.title("🚜 Proforma Receipt Generator (Word Doc)")
+st.title("Proforma Receipt Generator - Append Text")
 
 with st.form("receipt_form"):
     receipt_no = st.text_input("Receipt No", "ORBIT/2025/1/001")
@@ -57,22 +57,22 @@ with st.form("receipt_form"):
     submitted = st.form_submit_button("Generate Receipt (DOCX)")
 
 if submitted:
-    placeholder_map = {
-        "{{receipt_no}}": receipt_no,
-        "{{receipt_date}}": receipt_date.strftime("%d/%m/%Y"),
-        "{{customer_name}}": customer_name,
-        "{{address}}": address,
-        "{{phone}}": phone,
-        "{{email}}": email or "N/A",
-        "{{amount_received}}": f"₹ {amount_received} /-",
-        "{{payment_mode}}": payment_mode,
-        "{{reference_id}}": reference_id or "N/A",
-        "{{payment_date}}": payment_date.strftime("%d/%m/%Y"),
-        "{{balance_amount}}": f"₹ {balance_amount} /-",
-        "{{tentative_delivery}}": tentative_delivery.strftime("%d/%m/%Y"),
+    data = {
+        "receipt_no": receipt_no,
+        "receipt_date": receipt_date.strftime("%d/%m/%Y"),
+        "customer_name": customer_name,
+        "address": address,
+        "phone": phone,
+        "email": email or "N/A",
+        "amount_received": amount_received,
+        "payment_mode": payment_mode,
+        "reference_id": reference_id or "N/A",
+        "payment_date": payment_date.strftime("%d/%m/%Y"),
+        "balance_amount": balance_amount,
+        "tentative_delivery": tentative_delivery.strftime("%d/%m/%Y"),
     }
 
-    filled_docx = generate_filled_docx(placeholder_map)
+    filled_docx = generate_filled_docx(data)
 
     st.success("✅ Word document generated successfully!")
     st.download_button(
