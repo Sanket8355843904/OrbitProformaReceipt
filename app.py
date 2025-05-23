@@ -6,18 +6,19 @@ from reportlab.lib.utils import ImageReader
 from io import BytesIO
 import datetime
 
-# Function to create PDF in-memory and return bytes
 def create_pdf(data, letterhead_path):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Draw letterhead image at the top
-    if letterhead_path:
+    # Draw letterhead image at the top (5 cm height)
+    try:
         letterhead = ImageReader(letterhead_path)
         c.drawImage(letterhead, 0, height - 5*cm, width=width, height=5*cm, preserveAspectRatio=True)
+    except Exception as e:
+        print(f"Error loading letterhead image: {e}")
 
-    # Starting y position below letterhead
+    # Start writing below letterhead
     y = height - 6*cm
 
     # Title
@@ -40,7 +41,7 @@ def create_pdf(data, letterhead_path):
     c.drawString(2*cm, y, f"Date: {data['date']}")
     y -= 1*cm
 
-    # Product/Service Details Table header
+    # Table header
     c.setFont("Helvetica-Bold", 12)
     c.drawString(2*cm, y, "Description")
     c.drawString(10*cm, y, "Quantity")
@@ -50,7 +51,7 @@ def create_pdf(data, letterhead_path):
     c.line(2*cm, y, 19*cm, y)
     y -= 0.5*cm
 
-    # Product rows
+    # Table rows (single item for now)
     c.setFont("Helvetica", 12)
     for item in data['items']:
         c.drawString(2*cm, y, item['description'])
@@ -63,18 +64,18 @@ def create_pdf(data, letterhead_path):
     c.line(2*cm, y, 19*cm, y)
     y -= 0.5*cm
 
-    # Total Amount
+    # Total amount
     c.setFont("Helvetica-Bold", 12)
     c.drawString(13*cm, y, "Total Amount:")
     c.drawString(16*cm, y, f"{data['total_amount']:.2f}")
     y -= 2*cm
 
-    # Blank Signature Space
+    # Blank signature box
     c.setFont("Helvetica", 12)
     c.drawString(2*cm, y, "Authorized Signature:")
-    c.rect(5*cm, y - 1*cm, 6*cm, 2*cm)  # Blank box for signature
+    c.rect(5*cm, y - 1*cm, 6*cm, 2*cm)  # empty rectangle
 
-    # Footer
+    # Footer with company name (match your Word doc style as needed)
     c.setFont("Helvetica-Oblique", 10)
     c.drawCentredString(width/2, 1.5*cm, "Higher Orbit Agritech Pvt Ltd - Proforma Receipt")
 
@@ -86,7 +87,6 @@ def create_pdf(data, letterhead_path):
 # Streamlit UI
 st.title("Proforma Receipt Generator")
 
-# Input form
 with st.form("receipt_form"):
     st.header("Customer Details")
     customer_name = st.text_input("Customer Name")
@@ -98,8 +98,6 @@ with st.form("receipt_form"):
     date = st.date_input("Date", value=datetime.date.today())
 
     st.header("Items")
-
-    # For simplicity, allow entering 1 item; can extend to dynamic list if needed
     description = st.text_input("Item Description")
     quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
     unit_price = st.number_input("Unit Price", min_value=0.0, step=0.01, format="%.2f", value=0.00)
@@ -108,7 +106,7 @@ with st.form("receipt_form"):
 
 if submitted:
     amount = quantity * unit_price
-    total_amount = amount  # For now, single item
+    total_amount = amount  # single item total
 
     data = {
         "customer_name": customer_name,
@@ -127,8 +125,7 @@ if submitted:
         "total_amount": total_amount,
     }
 
-    # Provide your letterhead image path here or upload via Streamlit if you want
-    letterhead_path = "letterhead.png"  # Make sure this file is in the same folder or adjust path
+    letterhead_path = "letterpad design_printable (1)_page-0001.jpg"
 
     pdf_buffer = create_pdf(data, letterhead_path)
 
