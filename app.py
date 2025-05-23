@@ -1,83 +1,80 @@
 import streamlit as st
 from docx import Document
-from datetime import date
+import re
 from io import BytesIO
+from datetime import datetime
 
 TEMPLATE_PATH = "Sales Advance Receipt Template.docx"
 
-def generate_filled_docx(data, template_path=TEMPLATE_PATH):
-    doc = Document(template_path)
-    
-    # Clear all paragraphs (optional) or comment this if you want to keep template text
-    # for para in doc.paragraphs:
-    #     p = para._element
-    #     p.getparent().remove(p)
-    
-    # Append your data as paragraphs
-    doc.add_paragraph("Proforma Receipt\n")
-    doc.add_paragraph(f"Receipt No: {data['receipt_no']}\t\tDate: {data['receipt_date']}\n")
-    doc.add_paragraph(f"Customer Name: {data['customer_name']}")
-    doc.add_paragraph(f"Address: {data['address']}")
-    doc.add_paragraph(f"Phone Number: {data['phone']}")
-    doc.add_paragraph(f"Email: {data['email']}")
-    doc.add_paragraph(f"Amount Received: ₹ {data['amount_received']} /-")
-    doc.add_paragraph(f"Payment Mode: {data['payment_mode']}")
-    doc.add_paragraph(f"Reference ID: {data['reference_id']}")
-    doc.add_paragraph(f"Date of Payment: {data['payment_date']}")
-    doc.add_paragraph(f"Balance Amount: ₹ {data['balance_amount']} /-")
-    doc.add_paragraph(f"Tentative Delivery Date: {data['tentative_delivery']}")
-    doc.add_paragraph("\nAcknowledgement:\nWe acknowledge receipt of the above-mentioned amount as advance towards booking of the Orbit PT Pro. This receipt confirms the reservation of your machine. The final invoice will be issued at the time of full payment and delivery.")
-    doc.add_paragraph("\nAuthorised Signatory\n")
-    doc.add_paragraph("For Higher Orbit Agritech Pvt. Ltd.\nGST: 27AAHCH1976Q1ZS")
+# Extract placeholder lengths
+def extract_placeholders_with_limits(docx_file):
+    doc = Document(docx_file)
+    limits = {}
+    for para in doc.paragraphs:
+        matches = re.findall(r'(_{3,})', para.text)
+        for match in matches:
+            limits[match] = len(match)
+    return limits
 
-    doc_stream = BytesIO()
-    doc.save(doc_stream)
-    doc_stream.seek(0)
-    return doc_stream
+# Replace placeholders
+def generate_receipt(template_file, data):
+    doc = Document(template_file)
 
-st.title("Proforma Receipt Generator - Append Text")
-
-with st.form("receipt_form"):
-    receipt_no = st.text_input("Receipt No", "ORBIT/2025/1/001")
-    receipt_date = st.date_input("Receipt Date", date.today())
-
-    customer_name = st.text_input("Customer Name")
-    address = st.text_area("Address")
-    phone = st.text_input("Phone Number")
-    email = st.text_input("Email (optional)", "")
-
-    amount_received = st.text_input("Amount Received (₹)")
-    payment_mode = st.selectbox("Payment Mode", ["Cashfree", "Cash", "Other"])
-    reference_id = st.text_input("Reference ID (optional)", "")
-    payment_date = st.date_input("Payment Date", date.today())
-
-    balance_amount = st.text_input("Balance Amount (₹)")
-    tentative_delivery = st.date_input("Tentative Delivery Date", date.today())
-
-    submitted = st.form_submit_button("Generate Receipt (DOCX)")
-
-if submitted:
-    data = {
-        "receipt_no": receipt_no,
-        "receipt_date": receipt_date.strftime("%d/%m/%Y"),
-        "customer_name": customer_name,
-        "address": address,
-        "phone": phone,
-        "email": email or "N/A",
-        "amount_received": amount_received,
-        "payment_mode": payment_mode,
-        "reference_id": reference_id or "N/A",
-        "payment_date": payment_date.strftime("%d/%m/%Y"),
-        "balance_amount": balance_amount,
-        "tentative_delivery": tentative_delivery.strftime("%d/%m/%Y"),
+    replacements = {
+        '____________': data['receipt_no'],
+        '__/__/____': data['date'],
+        '_____________________________________________________________': data['customer_name'],
+        '____________________________________________________________________': data['address_line1'],
+        '___________________________________________________________________________': data['address_line2'],
+        '____________________________________________________________': data['phone'],
+        '___________________________________________________________': data['email'],
+        '__________________': data['amount_received'],
+        '_________________________': data['balance_due'],
     }
 
-    filled_docx = generate_filled_docx(data)
+    for para in doc.paragraphs:
+        for key, value in replacements.items():
+            if key in para.text:
+                for run in para.runs:
+                    run.text = run.text.replace(key, value)
 
-    st.success("✅ Word document generated successfully!")
-    st.download_button(
-        label="📄 Download Receipt (DOCX)",
-        data=filled_docx,
-        file_name=f"Receipt_{receipt_no.replace('/', '_')}.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# Streamlit UI
+st.set_page_config(page_title="Orbit Proforma Invoice Generator", page_icon="🧾")
+st.title("🚜 Orbit Proforma Invoice Generator")
+
+limits = extract_placeholders_with_limits(TEMPLATE_PATH)
+
+st.subheader("Enter Receipt Details")
+
+# Form inputs with length limits
+receipt_no = st.text_input("Receipt No", max_chars=limits.get('____________', 20))
+date = st.text_input("Date [DD/MM/YYYY]", value=datetime.today().strftime('%d/%m/%Y'), max_chars=limits.get('__/__/____', 10))
+customer_name = st.text_input("Customer Name", max_chars=limits.get('_____________________________________________________________', 75))
+address_line1 = st.text_input("Address Line 1", max_chars=limits.get('____________________________________________________________________', 80))
+address_line2 = st.text_input("Address Line 2", max_chars=limits.get('___________________________________________________________________________', 80))
+phone = st.text_input("Phone Number", max_chars=limits.get('____________________________________________________________', 60))
+email = st.text_input("Email", max_chars=limits.get('___________________________________________________________', 60))
+amount_received = st.text_input("Amount Received (₹)", max_chars=limits.get('__________________', 20))
+balance_due = st.text_input("Balance Amount Due (₹)", max_chars=limits.get('_________________________', 25))
+
+if st.button("Generate Receipt"):
+    data = {
+        'receipt_no': receipt_no,
+        'date': date,
+        'customer_name': customer_name,
+        'address_line1': address_line1,
+        'address_line2': address_line2,
+        'phone': phone,
+        'email': email,
+        'amount_received': amount_received,
+        'balance_due': balance_due
+    }
+    docx_buffer = generate_receipt(TEMPLATE_PATH, data)
+
+    st.success("✅ Receipt Generated!")
+    st.download_button("📥 Download Receipt", docx_buffer, file_name="Proforma_Receipt.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
