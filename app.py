@@ -125,7 +125,7 @@ if submitted:
         "total_amount": total_amount,
     }
 
-    letterhead_path = "letterpad design_printable (1)_page-0001.jpg"
+    letterhead_path = "letterhead.jpg"
 
     pdf_buffer = create_pdf(data, letterhead_path)
 
