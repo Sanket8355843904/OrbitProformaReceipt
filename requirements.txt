@@ -1,3 +1,4 @@
 streamlit
 python-docx
 docx2pdf ; platform_system == "Windows" or platform_system == "Darwin"
+reportlab
