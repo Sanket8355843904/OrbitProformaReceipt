@@ -6,53 +6,50 @@ TEMPLATE_PATH = "Sales Advance Receipt Template.docx"
 
 st.title("Proforma Receipt Generator")
 
-def numeric_input(label, max_length, **kwargs):
-    # Custom numeric input with max length limit
-    val = st.text_input(label, **kwargs)
-    # Remove non-digit chars and limit length
+def numeric_input(label, max_length, key=None):
+    val = st.text_input(label, key=key)
     val = ''.join(filter(str.isdigit, val))[:max_length]
     return val
 
-# Use bold labels via markdown + input on next line
+# Receipt Number (numeric, max 4 digits)
 st.markdown("**Receipt Number (max 4 digits, numeric only):**")
-receipt_no = numeric_input("", max_length=4)
+receipt_no = numeric_input("", max_length=4, key="receipt_no")
 
 st.markdown("**Date:**")
-date = st.date_input("", datetime.today()).strftime("%d/%m/%Y")
+date = st.date_input("", datetime.today(), key="date").strftime("%d/%m/%Y")
 
 st.markdown("**Customer Name (max 50 chars):**")
-customer_name = st.text_input("", max_chars=50)
+customer_name = st.text_input("", max_chars=50, key="customer_name")
 
 st.markdown("**Address Line 1 (max 100 chars):**")
-address_line1 = st.text_input("", max_chars=100, key="address1")
+address_line1 = st.text_input("", max_chars=100, key="address_line1")
 
-st.markdown("**Address Line 2 (max 100 chars):**")
-address_line2 = st.text_input("", max_chars=100, key="address2")
+st.markdown("**Address Line 2 (max 100 chars, optional):**")
+address_line2 = st.text_input("", max_chars=100, key="address_line2")
 
 st.markdown("**Phone Number (max 10 digits, numeric only):**")
-phone = numeric_input("", max_length=10)
+phone = numeric_input("", max_length=10, key="phone")
 
 st.markdown("**Email (optional, max 50 chars):**")
-email = st.text_input("", max_chars=50)
+email = st.text_input("", max_chars=50, key="email")
 
 st.markdown("**Amount Received (₹) (max 10 chars):**")
-amount_received = st.text_input("", max_chars=10)
+amount_received = st.text_input("", max_chars=10, key="amount_received")
 
 st.markdown("**Payment Mode:**")
-payment_mode = st.selectbox("", ["Cashfree", "Cash", "Other"])
+payment_mode = st.selectbox("", ["Cashfree", "Cash", "Other"], key="payment_mode")
 
 st.markdown("**Reference ID (optional, max 20 chars):**")
-reference_id = st.text_input("", max_chars=20)
+reference_id = st.text_input("", max_chars=20, key="reference_id")
 
 st.markdown("**Date of Payment:**")
-payment_date = st.date_input("", datetime.today()).strftime("%d/%m/%Y")
+payment_date = st.date_input("", datetime.today(), key="payment_date").strftime("%d/%m/%Y")
 
 st.markdown("**Balance Amount Due (₹) (max 10 chars):**")
-balance_due = st.text_input("", max_chars=10)
+balance_due = st.text_input("", max_chars=10, key="balance_due")
 
 st.markdown("**Tentative Delivery Date:**")
-tentative_delivery = st.date_input("", datetime.today()).strftime("%d/%m/%Y")
-
+tentative_delivery = st.date_input("", datetime.today(), key="tentative_delivery").strftime("%d/%m/%Y")
 
 if st.button("Generate Receipt DOCX"):
     if not receipt_no:
@@ -62,12 +59,12 @@ if st.button("Generate Receipt DOCX"):
     else:
         doc = DocxTemplate(TEMPLATE_PATH)
 
+        # Prepare context and skip address_line2 if empty
         context = {
             "receipt_no": receipt_no,
             "date": date,
             "customer_name": customer_name,
             "address_line1": address_line1,
-            "address_line2": address_line2,
             "phone": phone,
             "email": email if email else "N/A",
             "amount_received": amount_received,
@@ -77,6 +74,14 @@ if st.button("Generate Receipt DOCX"):
             "balance_due": balance_due,
             "tentative_delivery": tentative_delivery,
         }
+
+        # Only add address_line2 if it is not empty
+        if address_line2.strip():
+            context["address_line2"] = address_line2
+        else:
+            # If you want to avoid empty lines in the doc, 
+            # remove or handle it in your template accordingly.
+            context["address_line2"] = ""
 
         doc.render(context)
         output_filename = f"Sales_Advance_Receipt_{receipt_no}.docx"
