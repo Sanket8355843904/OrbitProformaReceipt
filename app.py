@@ -24,10 +24,10 @@ st.markdown("**Customer Name (max 50 chars):**")
 customer_name = st.text_input("", max_chars=50)
 
 st.markdown("**Address Line 1 (max 100 chars):**")
-address_line1 = st.text_input("", max_chars=100)
+address_line1 = st.text_input("", max_chars=100, key="address1")
 
 st.markdown("**Address Line 2 (max 100 chars):**")
-address_line2 = st.text_input("", max_chars=100)
+address_line2 = st.text_input("", max_chars=100, key="address2")
 
 st.markdown("**Phone Number (max 10 digits, numeric only):**")
 phone = numeric_input("", max_length=10)
