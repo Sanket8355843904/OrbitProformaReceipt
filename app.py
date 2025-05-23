@@ -5,16 +5,37 @@ from io import BytesIO
 
 TEMPLATE_PATH = "Sales Advance Receipt Template.docx"
 
-def generate_filled_docx(data):
-    doc = Document(TEMPLATE_PATH)
-    for p in doc.paragraphs:
-        for key, value in data.items():
-            if key in p.text:
-                inline = p.runs
-                for i in range(len(inline)):
-                    if key in inline[i].text:
-                        inline[i].text = inline[i].text.replace(key, value)
-    # Save to a BytesIO stream instead of a temp file
+def replace_placeholder(paragraph, placeholder, replacement):
+    """
+    Replace all occurrences of placeholder in a paragraph with replacement text,
+    even if the placeholder spans multiple runs.
+    """
+    full_text = ''.join(run.text for run in paragraph.runs)
+    if placeholder not in full_text:
+        return  # nothing to replace
+
+    new_text = full_text.replace(placeholder, replacement)
+
+    # Clear all runs and set the replaced text in the first run
+    for run in paragraph.runs:
+        run.text = ''
+    paragraph.runs[0].text = new_text
+
+def generate_filled_docx(data, template_path=TEMPLATE_PATH):
+    doc = Document(template_path)
+
+    for paragraph in doc.paragraphs:
+        for key, val in data.items():
+            replace_placeholder(paragraph, key, val)
+
+    # Also replace placeholders in tables if you have any there
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for key, val in data.items():
+                        replace_placeholder(paragraph, key, val)
+
     doc_stream = BytesIO()
     doc.save(doc_stream)
     doc_stream.seek(0)
