@@ -2,61 +2,91 @@ import streamlit as st
 from docxtpl import DocxTemplate
 from datetime import datetime
 
-# Path to your .docx template
 TEMPLATE_PATH = "Sales Advance Receipt Template.docx"
 
-st.title("Sales Advance Receipt Generator")
+st.title("Proforma Receipt Generator")
 
-# Inputs from user
-receipt_no = st.text_input("Receipt Number")
-date = st.date_input("Date", datetime.today()).strftime("%d/%m/%Y")
-customer_name = st.text_input("Customer Name")
-address_line1 = st.text_input("Address Line 1")
-address_line2 = st.text_input("Address Line 2")
-phone = st.text_input("Phone Number")
-email = st.text_input("Email (optional)")
-amount_received = st.text_input("Amount Received (₹)")
-payment_mode = st.selectbox("Payment Mode", ["Cashfree", "Cash", "Other"])
-reference_id = st.text_input("Reference ID (optional)")
-payment_date = st.date_input("Date of Payment", datetime.today()).strftime("%d/%m/%Y")
-balance_due = st.text_input("Balance Amount Due (₹)")
-tentative_delivery = st.date_input("Tentative Delivery Date", datetime.today()).strftime("%d/%m/%Y")
+def numeric_input(label, max_length, **kwargs):
+    # Custom numeric input with max length limit
+    val = st.text_input(label, **kwargs)
+    # Remove non-digit chars and limit length
+    val = ''.join(filter(str.isdigit, val))[:max_length]
+    return val
+
+# Use bold labels via markdown + input on next line
+st.markdown("**Receipt Number (max 4 digits, numeric only):**")
+receipt_no = numeric_input("", max_length=4)
+
+st.markdown("**Date:**")
+date = st.date_input("", datetime.today()).strftime("%d/%m/%Y")
+
+st.markdown("**Customer Name (max 50 chars):**")
+customer_name = st.text_input("", max_chars=50)
+
+st.markdown("**Address Line 1 (max 100 chars):**")
+address_line1 = st.text_input("", max_chars=100)
+
+st.markdown("**Address Line 2 (max 100 chars):**")
+address_line2 = st.text_input("", max_chars=100)
+
+st.markdown("**Phone Number (max 10 digits, numeric only):**")
+phone = numeric_input("", max_length=10)
+
+st.markdown("**Email (optional, max 50 chars):**")
+email = st.text_input("", max_chars=50)
+
+st.markdown("**Amount Received (₹) (max 10 chars):**")
+amount_received = st.text_input("", max_chars=10)
+
+st.markdown("**Payment Mode:**")
+payment_mode = st.selectbox("", ["Cashfree", "Cash", "Other"])
+
+st.markdown("**Reference ID (optional, max 20 chars):**")
+reference_id = st.text_input("", max_chars=20)
+
+st.markdown("**Date of Payment:**")
+payment_date = st.date_input("", datetime.today()).strftime("%d/%m/%Y")
+
+st.markdown("**Balance Amount Due (₹) (max 10 chars):**")
+balance_due = st.text_input("", max_chars=10)
+
+st.markdown("**Tentative Delivery Date:**")
+tentative_delivery = st.date_input("", datetime.today()).strftime("%d/%m/%Y")
+
 
 if st.button("Generate Receipt DOCX"):
-    # Load the template
-    doc = DocxTemplate(TEMPLATE_PATH)
+    if not receipt_no:
+        st.error("Receipt Number is required and must be numeric up to 4 digits.")
+    elif len(phone) != 10:
+        st.error("Phone Number must be exactly 10 digits.")
+    else:
+        doc = DocxTemplate(TEMPLATE_PATH)
 
-    # Context for template placeholders
-    context = {
-        "receipt_no": receipt_no,
-        "date": date,
-        "customer_name": customer_name,
-        "address_line1": address_line1,
-        "address_line2": address_line2,
-        "phone": phone,
-        "email": email if email else "N/A",
-        "amount_received": amount_received,
-        "payment_mode": payment_mode,
-        "reference_id": reference_id if reference_id else "N/A",
-        "payment_date": payment_date,
-        "balance_due": balance_due,
-        "tentative_delivery": tentative_delivery,
-    }
+        context = {
+            "receipt_no": receipt_no,
+            "date": date,
+            "customer_name": customer_name,
+            "address_line1": address_line1,
+            "address_line2": address_line2,
+            "phone": phone,
+            "email": email if email else "N/A",
+            "amount_received": amount_received,
+            "payment_mode": payment_mode,
+            "reference_id": reference_id if reference_id else "N/A",
+            "payment_date": payment_date,
+            "balance_due": balance_due,
+            "tentative_delivery": tentative_delivery,
+        }
 
-    # Render the docx with context
-    doc.render(context)
+        doc.render(context)
+        output_filename = f"Sales_Advance_Receipt_{receipt_no}.docx"
+        doc.save(output_filename)
+        st.success(f"Receipt generated: {output_filename}")
 
-    # Save the generated receipt with a unique name
-    output_filename = f"Sales_Advance_Receipt_{receipt_no}.docx"
-    doc.save(output_filename)
-
-    st.success(f"Receipt generated: {output_filename}")
-
-    # Provide a download link
-    with open(output_filename, "rb") as file:
-        btn = st.download_button(
-            label="Download Receipt DOCX",
-            data=file,
-            file_name=output_filename,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        with open(output_filename, "rb") as file:
+            st.download_button(
+                label="Download Receipt DOCX",
+                data=file,
+                file_name=output_filename,
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
