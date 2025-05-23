@@ -33,19 +33,19 @@ phone = numeric_input("", max_length=10, key="phone")
 st.markdown("**Email (optional, max 50 chars):**")
 email = st.text_input("", max_chars=50, key="email")
 
-st.markdown("**Amount Received (₹) (max 10 chars):**")
+st.markdown("**Amount Received (₹) (max 10 chars, numeric only):**")
 amount_received = st.text_input("", max_chars=10, key="amount_received")
 
 st.markdown("**Payment Mode:**")
 payment_mode = st.selectbox("", ["Cashfree", "Cash", "Other"], key="payment_mode")
 
-st.markdown("**Reference ID (optional, max 20 chars):**")
+st.markdown("**Reference ID (optional, max 20 chars, numeric only):**")
 reference_id = st.text_input("", max_chars=20, key="reference_id")
 
 st.markdown("**Date of Payment:**")
 payment_date = st.date_input("", datetime.today(), key="payment_date").strftime("%d/%m/%Y")
 
-st.markdown("**Balance Amount Due (₹) (max 10 chars):**")
+st.markdown("**Balance Amount Due (₹) (max 10 chars, numeric only):**")
 balance_due = st.text_input("", max_chars=10, key="balance_due")
 
 st.markdown("**Tentative Delivery Date:**")
